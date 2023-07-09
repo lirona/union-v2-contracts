@@ -31,6 +31,8 @@ contract UserManager is Controller, IUserManager, ReentrancyGuardUpgradeable {
         address staker;
         // trust amount
         uint96 trust;
+        // message from voucher about the vouchee
+        string message;
         // amount of stake locked by this vouch
         uint96 locked;
         // only update when lockedCoinAge is updated
@@ -215,8 +217,9 @@ contract UserManager is Controller, IUserManager, ReentrancyGuardUpgradeable {
      *  @param staker Trustee address
      *  @param borrower The address gets vouched for
      *  @param trustAmount Vouch amount
+     *  @param message Message from voucher about the vouchee
      */
-    event LogUpdateTrust(address indexed staker, address indexed borrower, uint256 trustAmount);
+    event LogUpdateTrust(address indexed staker, address indexed borrower, uint256 trustAmount, string message);
 
     /**
      *  @dev New member application event
@@ -527,7 +530,7 @@ contract UserManager is Controller, IUserManager, ReentrancyGuardUpgradeable {
      *  @param borrower Account address
      *  @param trustAmount Trust amount
      */
-    function updateTrust(address borrower, uint96 trustAmount) external onlyMember(msg.sender) whenNotPaused {
+    function updateTrust(address borrower, uint96 trustAmount, string message) external onlyMember(msg.sender) whenNotPaused {
         address staker = msg.sender;
         if (borrower == staker) revert ErrorSelfVouching();
 
@@ -541,6 +544,7 @@ contract UserManager is Controller, IUserManager, ReentrancyGuardUpgradeable {
             Vouch storage vouch = vouchers[borrower][index.idx];
             if (trustAmount < vouch.locked) revert TrustAmountLtLocked();
             vouch.trust = trustAmount;
+            vouch.message = message;
         } else {
             // If the member is overdue they cannot create new vouches they can
             // only update existing vouches
@@ -557,7 +561,7 @@ contract UserManager is Controller, IUserManager, ReentrancyGuardUpgradeable {
             uint256 voucherIndex = vouchers[borrower].length;
             if (voucherIndex >= maxVouchers) revert MaxVouchers();
             voucherIndexes[borrower][staker] = Index(true, voucherIndex.toUint128());
-            vouchers[borrower].push(Vouch(staker, trustAmount, 0, 0));
+            vouchers[borrower].push(Vouch(staker, trustAmount, message, 0, 0));
 
             // Add the voucherIndex of this new vouch to the vouchees array for this
             // staker then update the voucheeIndexes with the voucheeIndex
@@ -565,7 +569,7 @@ contract UserManager is Controller, IUserManager, ReentrancyGuardUpgradeable {
             voucheeIndexes[borrower][staker] = Index(true, voucheeIndex.toUint128());
         }
 
-        emit LogUpdateTrust(staker, borrower, trustAmount);
+        emit LogUpdateTrust(staker, borrower, trustAmount, message);
     }
 
     /**
